@@ -297,8 +297,8 @@ int main(int argc, char *argv[]) {
     const char *outputFilename = argv[2];
 
     size_t imageSize;
-    unsigned char *imageData;
     size_t imageWidth, imageHeight;
+    unsigned char *imageData;
     const char *imageFormat;
 
     // Cargar imagen y determinar formato
@@ -317,9 +317,9 @@ int main(int argc, char *argv[]) {
 
         // Guardar la imagen resultante
         if (strcmp(imageFormat, "png") == 0) {
-            savePNG(outputFilename, imageData, /*width, height*/);
+            savePNG(outputFilename, imageData, imageWidth, imageHeight);
         } else {
-            saveJPEG(outputFilename, imageData, /*width, height*/);
+            saveJPEG(outputFilename, imageData, imageWidth, imageHeight);
         }
     } else if (strcmp(imageFormat, "gif") == 0) {
         // Convertir a escala de grises
@@ -329,15 +329,6 @@ int main(int argc, char *argv[]) {
         equalizeHistogram(imageData, imageSize);
 
         // Guardar la imagen resultante
-        saveGIF(outputFilename, imageData, /*width, height*/);
+        saveGIF(outputFilename, imageData, imageWidth, imageHeight);
     } else {
         printf("Formato de imagen no compatible.\n");
-        free(imageData);
-        return 1;
-    }
-
-    // Liberar memoria y finalizar
-    free(imageData);
-
-    return 0;
-}
