@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <png.h>
 #include <jpeglib.h>
 #include <gif_lib.h> // Necesitarás giflib para trabajar con GIF
