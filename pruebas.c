@@ -331,10 +331,10 @@ int main() {
     // Determinar el tipo de imagen y realizar el procesamiento adecuado
     if (strcmp(imageFormat, "png") == 0 || strcmp(imageFormat, "jpg") == 0 || strcmp(imageFormat, "jpeg") == 0) {
         // Convertir a escala de grises
-        //convertToGrayscale(imageData, imageSize);
+        convertToGrayscale(imageData, imageSize);
 
         // Aplicar ecualización de histograma
-        //equalizeHistogram(imageData, imageSize);
+        equalizeHistogram(imageData, imageSize);
 
         // Guardar la imagen resultante
         if (strcmp(imageFormat, "png") == 0) {
@@ -347,7 +347,7 @@ int main() {
     } else if (strcmp(imageFormat, "gif") == 0) {
         printf("imagen con Formato gif.\n");
         // Convertir a escala de grises
-        //convertToGrayscale(imageData, imageSize);
+        convertToGrayscale(imageData, imageSize);
 
         // Aplicar ecualización de histograma
         //equalizeHistogram(imageData, imageSize);
