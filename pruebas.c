@@ -3,9 +3,53 @@
 #include "jpeglib.h"
 #include <string.h>
 #include <png.h>
+#include <gif_lib.h> 
 
 unsigned char *loadGIF(const char *filename, size_t *size, size_t *width, size_t *height) {
-    return "s";
+    GifFileType *gif = DGifOpenFileName(filename, NULL);
+    if (!gif) {
+        perror("Error al abrir el archivo GIF");
+        return NULL;
+    }
+
+    if (DGifSlurp(gif) != GIF_OK) {
+        DGifCloseFile(gif, NULL);
+        perror("Error al leer el archivo GIF");
+        return NULL;
+    }
+
+    *width = gif->SWidth;
+    *height = gif->SHeight;
+    size_t channels = 3; // GIF se carga en formato RGB
+
+    *size = *width * *height * channels;
+
+    unsigned char *imageData = (unsigned char *)malloc(*size);
+    if (!imageData) {
+        DGifCloseFile(gif, NULL);
+        perror("Error de asignación de memoria");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < gif->ImageCount; i++) {
+        GifImageDesc imageDesc = gif->SavedImages[i].ImageDesc;
+        GifByteType *src = gif->SavedImages[i].RasterBits;
+        unsigned char *dest = imageData + imageDesc.Top * *width * channels + imageDesc.Left * channels;
+
+        for (size_t row = 0; row < imageDesc.Height; row++) {
+            for (size_t col = 0; col < imageDesc.Width; col++) {
+                dest[col * channels + 0] = src[col * channels + 0]; // R
+                dest[col * channels + 1] = src[col * channels + 1]; // G
+                dest[col * channels + 2] = src[col * channels + 2]; // B
+            }
+            src += imageDesc.Width * channels;
+            dest += *width * channels;
+        }
+    }
+
+    DGifCloseFile(gif, NULL);
+
+    return imageData;
 }
 
 unsigned char *loadPNG(const char *filename, size_t *size, size_t *width, size_t *height) {
