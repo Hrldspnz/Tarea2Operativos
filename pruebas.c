@@ -13,6 +13,27 @@ void convertToGrayscale(unsigned char *data, size_t size) {
     }
 }
 
+void equalizeHistogram(unsigned char *data, size_t size) {
+    int histogram[256] = {0};
+
+    // Calcular el histograma de niveles de gris
+    for (size_t i = 0; i < size; i++) {
+        histogram[data[i]]++;
+    }
+
+    // Calcular la función de transformación acumulativa
+    int cumulativeHistogram[256];
+    cumulativeHistogram[0] = histogram[0];
+    for (int i = 1; i < 256; i++) {
+        cumulativeHistogram[i] = cumulativeHistogram[i - 1] + histogram[i];
+    }
+
+    // Aplicar la ecualización de histograma
+    for (size_t i = 0; i < size; i++) {
+        data[i] = (cumulativeHistogram[data[i]] * 255) / size;
+    }
+}
+
 
 
 unsigned char *loadGIF(const char *filename, size_t *size, size_t *width, size_t *height) {
@@ -226,6 +247,68 @@ void savePNG(const char *filename, unsigned char *data, size_t width, size_t hei
     fclose(file);
 }
 
+void saveJPEG(const char *filename, unsigned char *data, size_t width, size_t height) {
+    FILE *file = fopen(filename, "wb");
+    if (!file) {
+        perror("Error al abrir el archivo");
+        return;
+    }
+
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_compress(&cinfo);
+    jpeg_stdio_dest(&cinfo, file);
+
+    cinfo.image_width = width;
+    cinfo.image_height = height;
+    cinfo.input_components = 3; // 3 canales: RGB
+    cinfo.in_color_space = JCS_RGB;
+    jpeg_set_defaults(&cinfo);
+
+    jpeg_start_compress(&cinfo, TRUE);
+
+    JSAMPROW row_pointer[1];
+    while (cinfo.next_scanline < cinfo.image_height) {
+        row_pointer[0] = &data[cinfo.next_scanline * width * 3]; // 3 canales: RGB
+        jpeg_write_scanlines(&cinfo, row_pointer, 1);
+    }
+
+    jpeg_finish_compress(&cinfo);
+    jpeg_destroy_compress(&cinfo);
+    fclose(file);
+}
+
+void saveGIF(const char *filename, unsigned char *data, size_t width, size_t height) {
+    GifFileType *gif = EGifOpenFileName(filename, FALSE, NULL);
+    if (!gif) {
+        perror("Error al abrir el archivo GIF");
+        return;
+    }
+
+    int colorMapSize = 256;
+    ColorMapObject *colorMap = GifMakeMapObject(colorMapSize, NULL);
+    if (!colorMap) {
+        EGifCloseFile(gif, NULL);
+        perror("Error al crear mapa de colores");
+        return;
+    }
+
+    for (int i = 0; i < colorMapSize; i++) {
+        colorMap->Colors[i].Red = data[i * 3 + 0];
+        colorMap->Colors[i].Green = data[i * 3 + 1];
+        colorMap->Colors[i].Blue = data[i * 3 + 2];
+    }
+
+    EGifSetGifVersion(gif, TRUE); // Aquí es donde puedes usar TRUE o FALSE según corresponda
+
+    EGifPutScreenDesc(gif, width, height, colorMapSize, 0, colorMap);
+    EGifSpew(gif);
+
+    EGifCloseFile(gif, NULL);
+    GifFreeMapObject(colorMap);
+}
 
 int main() {
     char filename[100]; // Se reserva espacio para el nombre del archivo
@@ -248,7 +331,7 @@ int main() {
     // Determinar el tipo de imagen y realizar el procesamiento adecuado
     if (strcmp(imageFormat, "png") == 0 || strcmp(imageFormat, "jpg") == 0 || strcmp(imageFormat, "jpeg") == 0) {
         // Convertir a escala de grises
-        convertToGrayscale(imageData, imageSize);
+        //convertToGrayscale(imageData, imageSize);
 
         // Aplicar ecualización de histograma
         //equalizeHistogram(imageData, imageSize);
@@ -258,19 +341,19 @@ int main() {
             savePNG(outputFilename, imageData, imageWidth, imageHeight);
             printf("imagen con Formato png.\n");
         } else {
-            //saveJPEG(outputFilename, imageData, imageWidth, imageHeight);
+            saveJPEG(outputFilename, imageData, imageWidth, imageHeight);//Esta vara da error
             printf("imagen con Formato jpg o jpeg.\n");
         }
     } else if (strcmp(imageFormat, "gif") == 0) {
         printf("imagen con Formato gif.\n");
         // Convertir a escala de grises
-        convertToGrayscale(imageData, imageSize);
+        //convertToGrayscale(imageData, imageSize);
 
         // Aplicar ecualización de histograma
         //equalizeHistogram(imageData, imageSize);
 
         // Guardar la imagen resultante
-        //saveGIF(outputFilename, imageData, imageWidth, imageHeight);
+        saveGIF(outputFilename, imageData, imageWidth, imageHeight);
     } else {
         printf("Formato de imagen no compatible.\n");
     }
