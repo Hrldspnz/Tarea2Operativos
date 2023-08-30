@@ -274,7 +274,8 @@ void saveGIF(const char *filename, unsigned char *data, size_t width, size_t hei
         colorMap->Colors[i].Blue = data[i * 3 + 2];
     }
 
-    EGifSetGifVersion("89a");
+    EGifSetGifVersion(gif, TRUE); // Aquí es donde puedes usar TRUE o FALSE según corresponda
+
     EGifPutScreenDesc(gif, width, height, colorMapSize, 0, colorMap);
     EGifSpew(gif);
 
