@@ -5,6 +5,16 @@
 #include <png.h>
 #include <gif_lib.h> 
 
+void convertToGrayscale(unsigned char *data, size_t size) {
+    for (size_t i = 0; i < size; i += 3) {
+        // Convertir a escala de grises (promedio de los canales RGB)
+        unsigned char gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        data[i] = data[i + 1] = data[i + 2] = gray;
+    }
+}
+
+
+
 unsigned char *loadGIF(const char *filename, size_t *size, size_t *width, size_t *height) {
     GifFileType *gif = DGifOpenFileName(filename, NULL);
     if (!gif) {
@@ -174,10 +184,56 @@ unsigned char *loadImage(const char *filename, size_t *size, size_t *width, size
     }
 }
 
+
+void savePNG(const char *filename, unsigned char *data, size_t width, size_t height) {
+    FILE *file = fopen(filename, "wb");
+    if (!file) {
+        perror("Error al abrir el archivo");
+        return;
+    }
+
+    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png) {
+        fclose(file);
+        perror("Error al crear estructura PNG");
+        return;
+    }
+
+    png_infop info = png_create_info_struct(png);
+    if (!info) {
+        fclose(file);
+        png_destroy_write_struct(&png, NULL);
+        perror("Error al crear estructura de información PNG");
+        return;
+    }
+
+    png_init_io(png, file);
+
+    // Configurar los parámetros de la imagen PNG
+    png_set_IHDR(png, info, width, height, 8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+    png_write_info(png, info);
+
+    // Escribir los datos de la imagen
+    png_bytep row_pointers[height];
+    for (size_t y = 0; y < height; y++) {
+        row_pointers[y] = data + y * width * 4; // 4 canales RGBA
+    }
+    png_write_image(png, row_pointers);
+
+    // Finalizar y limpiar
+    png_write_end(png, NULL);
+    png_destroy_write_struct(&png, &info);
+    fclose(file);
+}
+
+
 int main() {
     char filename[100]; // Se reserva espacio para el nombre del archivo
+    char outputFilename[100];
     printf("Ingresa el nombre del archivo de imagen: ");
     scanf("%s", filename);
+    printf("Ingresa el nombre del archivo de salida: ");
+    scanf("%s", outputFilename);
 
     size_t imageSize;
     size_t imageWidth, imageHeight;
@@ -185,31 +241,6 @@ int main() {
     const char *imageFormat;
     imageData = loadImage(filename, &imageSize, &imageWidth, &imageHeight, &imageFormat); 
 
-    if (imageData) {
-        printf("Carga completa\n");
-        // Aquí puedes realizar cualquier otra operación que necesites con la imagen cargada
-        // Por ejemplo, liberar la memoria cuando ya no la necesites: free(imageData);
-    }
-
-    return 0;
-}
-
-/*int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        printf("Uso: %s <input_image> <output_image>\n", argv[0]);
-        return 1;
-    }
-
-    const char *inputFilename = argv[1];
-    const char *outputFilename = argv[2];
-
-    size_t imageSize;
-    size_t imageWidth, imageHeight;
-    unsigned char *imageData;
-    const char *imageFormat;
-
-    // Cargar imagen y determinar formato
-    imageData = loadImage(inputFilename, &imageSize, &imageWidth, &imageHeight, &imageFormat);
     if (!imageData) {
         return 1;
     }
@@ -220,24 +251,28 @@ int main() {
         convertToGrayscale(imageData, imageSize);
 
         // Aplicar ecualización de histograma
-        equalizeHistogram(imageData, imageSize);
+        //equalizeHistogram(imageData, imageSize);
 
         // Guardar la imagen resultante
         if (strcmp(imageFormat, "png") == 0) {
             savePNG(outputFilename, imageData, imageWidth, imageHeight);
+            printf("imagen con Formato png.\n");
         } else {
-            saveJPEG(outputFilename, imageData, imageWidth, imageHeight);
+            //saveJPEG(outputFilename, imageData, imageWidth, imageHeight);
+            printf("imagen con Formato jpg o jpeg.\n");
         }
     } else if (strcmp(imageFormat, "gif") == 0) {
+        printf("imagen con Formato gif.\n");
         // Convertir a escala de grises
         convertToGrayscale(imageData, imageSize);
 
         // Aplicar ecualización de histograma
-        equalizeHistogram(imageData, imageSize);
+        //equalizeHistogram(imageData, imageSize);
 
         // Guardar la imagen resultante
-        saveGIF(outputFilename, imageData, imageWidth, imageHeight);
+        //saveGIF(outputFilename, imageData, imageWidth, imageHeight);
     } else {
         printf("Formato de imagen no compatible.\n");
     }
-}*/
+}
+
