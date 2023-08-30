@@ -66,7 +66,25 @@ unsigned char *loadPNG(const char *filename, size_t *size, size_t *width, size_t
     // Calcular el tamaño total de los datos de la imagen
     *size = *width * *height * (bit_depth / 8) * png_get_channels(png, info);
 
-    // ... (código de carga de imagen PNG)
+    // Reservar memoria para los datos de la imagen
+    unsigned char *imageData = (unsigned char *)malloc(*size);
+    if (!imageData) {
+        fclose(file);
+        png_destroy_read_struct(&png, &info, NULL);
+        perror("Error de asignación de memoria");
+        return NULL;
+    }
+
+    // Leer y cargar los datos de la imagen
+    png_bytep row_pointers[*height];
+    for (size_t y = 0; y < *height; y++) {
+        row_pointers[y] = imageData + y * *width * png_get_channels(png, info) * (bit_depth / 8);
+    }
+    png_read_image(png, row_pointers);
+
+    // Finalizar y limpiar
+    png_destroy_read_struct(&png, &info, NULL);
+    fclose(file);
 
     return imageData;
 }
@@ -332,3 +350,5 @@ int main(int argc, char *argv[]) {
         saveGIF(outputFilename, imageData, imageWidth, imageHeight);
     } else {
         printf("Formato de imagen no compatible.\n");
+    }
+}
