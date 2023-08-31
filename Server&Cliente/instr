@@ -1,0 +1,29 @@
+sudo docker run -it -p 8080:1717 --name ContenedorTarea2 ubuntu /bin/bash
+
+
+sudo docker exec -it ContenedorTarea2 /bin/bash
+
+
+sudo docker stop ContenedorTarea2
+
+
+sudo docker start ContenedorTarea2
+
+
+sudo docker rm ContenedorTarea2
+
+
+sudo docker cp /home/armando/Documentos/Semestre_2_2023/SO/Tarea2/imagenes ContenedorTarea2:/home/Tarea2/
+
+
+Contenedor
+
+apt update
+apt install python3
+apt install python3-pip
+pip3 install requests
+apt install nano
+
+
+
+
