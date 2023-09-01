@@ -4,11 +4,11 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netdb.h>q
+#include <netdb.h>
 #include <dirent.h>
 
 
-#define SERVER_IP "127.0.0.1"
+#define SERVER_IP "172.172.221.50"
 #define SERVER_PORT 1717
 
 void SendImages(const char *NameFile);

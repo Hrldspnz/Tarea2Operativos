@@ -4,28 +4,58 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <jpeglib.h>
+
 
 #define PORT 1717
 #define BUFFER_SIZE 50000
 
-void handle_put_request(int client_socket, char *request_buffer) {
+void analyceColor(char *imgPath,char *imgName);
 
-    ssize_t bytes_read;
 
-    printf("Contenido de request_buffer:\n%s\n", request_buffer);
+typedef struct {
+    uint8_t blue;
+    uint8_t green;
+    uint8_t red;
+} Pixel;
 
-    // Enviar respuesta 200 OK al cliente
-    const char *response = "HTTP/1.1 200 OK\r\n\r\n";
-    send(client_socket, response, strlen(response), 0);
+void handle_put_request2(int client_socket) {
+    char request_buffer[BUFFER_SIZE];
+    ssize_t bytes_received = 0;
 
-    printf("\nMensaje completado.\n");
-}
+    // Inicializa el búfer de solicitud
+    memset(request_buffer, 0, sizeof(request_buffer));
 
-void handle_put_request2(int client_socket, char *request_buffer, ssize_t request_size, char *imgName) {
+    // Lee los datos de la solicitud hasta que se complete
+    while (1) {
+        ssize_t bytes = recv(client_socket, request_buffer + bytes_received, BUFFER_SIZE - bytes_received, 0);
+        if (bytes <= 0) {
+            break;  // Fin de la solicitud o error
+        }
+        bytes_received += bytes;
+
+        // Verifica si la solicitud está completa
+        if (strstr(request_buffer, "\r\n\r\n") != NULL) {
+            break;
+        }
+    }
+
+    if (bytes_received <= 0) {
+        // Error o conexión cerrada por el cliente
+        perror("Error receiving request");
+        return;
+    }
+
+    // Analiza la solicitud una vez que se completa
     char *file_start = strstr(request_buffer, "\r\n\r\n");
 
     if (file_start) {
         file_start += 4;  // Avanzar el puntero después de "\r\n\r\n"
+
+        char imgName[50];
+        // Parsea el nombre de la imagen desde la solicitud si es necesario
+        sscanf(request_buffer, "PUT /%s", imgName);
 
         char path[100];
         strcpy(path, "./ImagenesRecibidas/");
@@ -37,11 +67,12 @@ void handle_put_request2(int client_socket, char *request_buffer, ssize_t reques
             return;
         }
 
-        size_t data_length = request_size - (file_start - request_buffer);
+        size_t data_length = bytes_received - (file_start - request_buffer);
         fwrite(file_start, 1, data_length, file);
 
         fclose(file);
 
+        analyceColor(path, imgName);
     }
 
     // Enviar respuesta 200 OK al cliente
@@ -49,6 +80,84 @@ void handle_put_request2(int client_socket, char *request_buffer, ssize_t reques
     send(client_socket, response, strlen(response), 0);
 
     printf("\nMensaje completado.\n");
+}
+
+void analyceColor(char *imgPath,char *imgName){
+    const char *newPath = "./ImagenesColor/"; 
+    FILE *jpg_file = fopen(imgPath, "rb");
+    if (!jpg_file) {
+        printf("No se pudo abrir la imagen.\n");
+    }
+
+
+    struct jpeg_decompress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_decompress(&cinfo);
+    jpeg_stdio_src(&cinfo, jpg_file);
+    jpeg_read_header(&cinfo, TRUE);
+    jpeg_start_decompress(&cinfo);
+
+    int red_sum = 0;
+    int green_sum = 0;
+    int blue_sum = 0;
+    int pixel_count = 0;
+
+    while (cinfo.output_scanline < cinfo.output_height) {
+        unsigned char *row_ptr = (unsigned char *)malloc(cinfo.output_width * cinfo.output_components);
+        jpeg_read_scanlines(&cinfo, &row_ptr, 1);
+
+        for (int i = 0; i < cinfo.output_width * cinfo.output_components; i += cinfo.output_components) {
+            red_sum += row_ptr[i];
+            green_sum += row_ptr[i + 1];
+            blue_sum += row_ptr[i + 2];
+            pixel_count++;
+        }
+
+        free(row_ptr);
+    }
+
+    fclose(jpg_file);
+    jpeg_finish_decompress(&cinfo);
+    jpeg_destroy_decompress(&cinfo);
+
+    double red_avg = (double)red_sum;
+    double green_avg = (double)green_sum;
+    double blue_avg = (double)blue_sum;
+
+    if (red_avg > green_avg && red_avg > blue_avg) {
+        char path[100];
+        strcpy(path, newPath);
+        strcat(path, "rojo/");
+        strcat(path, imgName);
+        rename(imgPath, path);
+        printf("Imagen: %s\n", path);
+        printf("Promedio de color rojo: %.2f\n", red_avg);
+        printf("Promedio de color verde: %.2f\n", green_avg);
+        printf("Promedio de color azul: %.2f\n", blue_avg);
+    } else if (green_avg > red_avg && green_avg > blue_avg) {
+        char path[100];
+        strcpy(path, newPath);
+        strcat(path, "verde/");
+        strcat(path, imgName);
+        rename(imgPath, path);
+        printf("Imagen: %s\n", path);
+        printf("Promedio de color rojo: %.2f\n", red_avg);
+        printf("Promedio de color verde: %.2f\n", green_avg);
+        printf("Promedio de color azul: %.2f\n", blue_avg);
+    } else {
+        char path[100];
+        strcpy(path, newPath);
+        strcat(path, "azul/");
+        strcat(path, imgName);
+        rename(imgPath, path);
+        printf("Imagen: %s\n", path);
+        printf("Promedio de color rojo: %.2f\n", red_avg);
+        printf("Promedio de color verde: %.2f\n", green_avg);
+        printf("Promedio de color azul: %.2f\n", blue_avg);
+    }
+
 }
 
 
@@ -90,26 +199,10 @@ int main() {
             continue;
         }
 
-        char request_buffer[BUFFER_SIZE];
-        ssize_t bytes_received = recv(client_socket, request_buffer, BUFFER_SIZE, 0);
+        printf("Connection accepted...\n");
 
-        printf("Cantidad de bytes recibidos: %zd\n", bytes_received);
-
-        if (bytes_received > 0) {
-            // Parse the request to get the method and file name
-            char method[10];
-            char imageName[50];
-
-            sscanf(request_buffer, "%s /%s", method, imageName);
-        
-
-            if (strcmp(method, "PUT") == 0) {
-                printf("Handling PUT request\n");
-                handle_put_request2(client_socket, request_buffer, bytes_received, imageName);
-            } else {
-                printf("Unsupported method: %s\n", method);
-            }
-        }
+        // Manejar la solicitud en un nuevo hilo o proceso si es necesario
+        handle_put_request2(client_socket);
 
         close(client_socket);
     }

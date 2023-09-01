@@ -26,4 +26,8 @@ apt install nano
 
 
 
+Compilar server:
+
+gcc server.c -o server -ljpeg
+
 
