@@ -25,6 +25,42 @@ typedef struct {
     uint8_t red;
 } Pixel;
 
+// Función para cargar la configuración desde el archivo
+void cargarConfiguracion() {
+    FILE *archivoConfig = fopen("config.conf", "r");
+    if (archivoConfig == NULL) {
+        printf("Error al abrir el archivo de configuración.\n");
+        exit(1);
+    }
+
+    char linea[100]; // Supongamos un tamaño máximo de línea de 100 caracteres
+
+    while (fgets(linea, sizeof(linea), archivoConfig)) {
+        char *token = strtok(linea, ":");
+        if (token != NULL) {
+            char *clave = trim(token); // Función para eliminar espacios en blanco alrededor de la clave
+
+            token = strtok(NULL, ":");
+            if (token != NULL) {
+                char *valor = trim(token); // Función para eliminar espacios en blanco alrededor del valor
+
+                // Asignar el valor a la variable correspondiente
+                if (strcmp(clave, "Port") == 0) {
+                    Port = atoi(valor); // Convertir a entero
+                } else if (strcmp(clave, "DirColores") == 0) {
+                    strcpy(DirColores, valor);
+                } else if (strcmp(clave, "DirHisto") == 0) {
+                    strcpy(DirHisto, valor);
+                } else if (strcmp(clave, "DirLog") == 0) {
+                    strcpy(DirLog, valor);
+                }
+            }
+        }
+    }
+
+    fclose(archivoConfig);
+}
+
 void escribirEnRegistro(const char *mensaje) {
     // Abrir el archivo de registro en modo de escritura (si no existe, se creará)
     FILE *archivoLog = fopen("registro.log", "a"); // "a" para agregar al archivo existente
