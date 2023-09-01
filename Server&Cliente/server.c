@@ -9,7 +9,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <png.h>
-#include <gif_lib.h> 
+#include <gif_lib.h>
+#include <time.h>
 
 
 #define PORT 1717
@@ -23,6 +24,37 @@ typedef struct {
     uint8_t green;
     uint8_t red;
 } Pixel;
+
+void escribirEnRegistro(const char *mensaje) {
+    // Abrir el archivo de registro en modo de escritura (si no existe, se creará)
+    FILE *archivoLog = fopen("registro.log", "a"); // "a" para agregar al archivo existente
+
+    if (archivoLog == NULL) {
+        printf("No se pudo abrir el archivo de registro.\n");
+        return;
+    }
+
+    // Obtener la fecha y hora actual
+    time_t tiempo;
+    struct tm *tiempoInfo;
+    time(&tiempo);
+    tiempoInfo = localtime(&tiempo);
+    char tiempoFormateado[80];
+    strftime(tiempoFormateado, sizeof(tiempoFormateado), "%Y-%m-%d %H:%M:%S", tiempoInfo);
+
+    // Escribir el mensaje de registro en el archivo
+    fprintf(archivoLog, "[%s] %s\n", tiempoFormateado, mensaje);
+
+    // Cerrar el archivo de registro
+    fclose(archivoLog);
+}
+
+int main() {
+    // Llamamos a la función escribirEnRegistro para registrar un mensaje
+    escribirEnRegistro("Este es un mensaje de registro desde una función.");
+
+    return 0;
+}
 
 void handle_put_request2(int client_socket) {
     char request_buffer[BUFFER_SIZE];
