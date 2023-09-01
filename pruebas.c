@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include "jpeglib.h"
 #include <string.h>
 #include <png.h>
@@ -12,6 +13,8 @@ void convertToGrayscale(unsigned char *data, size_t size) {
         data[i] = data[i + 1] = data[i + 2] = gray;
     }
 }
+
+
 
 void equalizeHistogram(unsigned char *data, size_t size) {
     int histogram[256] = {0};
@@ -36,51 +39,35 @@ void equalizeHistogram(unsigned char *data, size_t size) {
 
 
 
-unsigned char *loadGIF(const char *filename, size_t *size, size_t *width, size_t *height) {
-    GifFileType *gif = DGifOpenFileName(filename, NULL);
+
+GifFileType* loadGIF(const char* nombreArchivo) {
+    int error;
+    GifFileType* gif = DGifOpenFileName(nombreArchivo, &error);
     if (!gif) {
-        perror("Error al abrir el archivo GIF");
+        fprintf(stderr, "Error al abrir el archivo GIF: %s\n", GifErrorString(error));
         return NULL;
     }
 
-    if (DGifSlurp(gif) != GIF_OK) {
-        DGifCloseFile(gif, NULL);
-        perror("Error al leer el archivo GIF");
+    // Avanzar hasta el último frame (si hay más de uno)
+    while (DGifGetRecordType(gif, &error) != TERMINATE_RECORD_TYPE) {
+        // No es necesario hacer nada aquí
+    }
+
+    // Verificar si se leyó al menos un frame
+    if (gif->ImageCount < 1) {
+        fprintf(stderr, "El archivo GIF no contiene frames.\n");
+        DGifCloseFile(gif, &error);
         return NULL;
     }
 
-    *width = gif->SWidth;
-    *height = gif->SHeight;
-    size_t channels = 3; // GIF se carga en formato RGB
+    return gif;
+}
 
-    *size = *width * *height * channels;
-
-    unsigned char *imageData = (unsigned char *)malloc(*size);
-    if (!imageData) {
-        DGifCloseFile(gif, NULL);
-        perror("Error de asignación de memoria");
-        return NULL;
+void liberarGIFUnSoloFrame(GifFileType* gif) {
+    if (gif) {
+        int error;
+        DGifCloseFile(gif, &error);
     }
-
-    for (size_t i = 0; i < gif->ImageCount; i++) {
-        GifImageDesc imageDesc = gif->SavedImages[i].ImageDesc;
-        GifByteType *src = gif->SavedImages[i].RasterBits;
-        unsigned char *dest = imageData + imageDesc.Top * *width * channels + imageDesc.Left * channels;
-
-        for (size_t row = 0; row < imageDesc.Height; row++) {
-            for (size_t col = 0; col < imageDesc.Width; col++) {
-                dest[col * channels + 0] = src[col * channels + 0]; // R
-                dest[col * channels + 1] = src[col * channels + 1]; // G
-                dest[col * channels + 2] = src[col * channels + 2]; // B
-            }
-            src += imageDesc.Width * channels;
-            dest += *width * channels;
-        }
-    }
-
-    DGifCloseFile(gif, NULL);
-
-    return imageData;
 }
 
 unsigned char *loadPNG(const char *filename, size_t *size, size_t *width, size_t *height) {
@@ -280,44 +267,39 @@ void saveJPEG(const char *filename, unsigned char *data, size_t width, size_t he
     fclose(file);
 }
 
-void saveGIF(const char *filename, unsigned char *data, size_t width, size_t height) {
-    GifFileType *gif = EGifOpenFileName(filename, FALSE, NULL);
-    if (!gif) {
-        perror("Error al abrir el archivo GIF");
-        return;
+int saveGIF(const char* nombreArchivo, GifFileType* gif, int width, int height, unsigned char* data) {
+    int error;
+
+    if (DGifOpenFileName(nombreArchivo, &error) == GIF_ERROR) {
+        fprintf(stderr, "Error al abrir el archivo de salida GIF.\n");
+        return 1;
     }
 
-    int colorMapSize = 256;
-    ColorMapObject *colorMap = GifMakeMapObject(colorMapSize, NULL);
-    if (!colorMap) {
-        EGifCloseFile(gif, NULL);
-        perror("Error al crear mapa de colores");
-        return;
+    if (DGifPutScreenDesc(gif, gif->SWidth, gif->SHeight, gif->SColorResolution, gif->SBackGroundColor, gif->SColorMap) == GIF_ERROR) {
+        fprintf(stderr, "Error al escribir la descripción de la pantalla GIF.\n");
+        return 1;
     }
 
-    for (int i = 0; i < colorMapSize; i++) {
-        colorMap->Colors[i].Red = data[i * 3 + 0];
-        colorMap->Colors[i].Green = data[i * 3 + 1];
-        colorMap->Colors[i].Blue = data[i * 3 + 2];
+    if (DGifPutImageDesc(gif, 0, 0, width, height, gif->SColorMap) == GIF_ERROR) {
+        fprintf(stderr, "Error al escribir la descripción de la imagen GIF.\n");
+        return 1;
     }
 
-    EGifSetGifVersion(gif, TRUE); // Aquí es donde puedes usar TRUE o FALSE según corresponda
+    if (DGifPutLine(gif, data, 3 * width * height) == GIF_ERROR) {
+        fprintf(stderr, "Error al escribir los datos de la imagen GIF.\n");
+        return 1;
+    }
 
-    EGifPutScreenDesc(gif, width, height, colorMapSize, 0, colorMap);
-    EGifSpew(gif);
+    if (DGifCloseFile(gif, &error) == GIF_ERROR) {
+        fprintf(stderr, "Error al cerrar el archivo de salida GIF.\n");
+        return 1;
+    }
 
-    EGifCloseFile(gif, NULL);
-    GifFreeMapObject(colorMap);
+    return 0;
 }
 
-int main() {
-    char filename[100]; // Se reserva espacio para el nombre del archivo
-    char outputFilename[100];
-    printf("Ingresa el nombre del archivo de imagen: ");
-    scanf("%s", filename);
-    printf("Ingresa el nombre del archivo de salida: ");
-    scanf("%s", outputFilename);
-
+int Histograma(char filename[100],char outputFilename[100]) {
+    // Se reserva espacio para el nombre del archivo
     size_t imageSize;
     size_t imageWidth, imageHeight;
     unsigned char *imageData;
@@ -325,14 +307,14 @@ int main() {
     imageData = loadImage(filename, &imageSize, &imageWidth, &imageHeight, &imageFormat); 
 
     if (!imageData) {
-        return 1;
+        printf("No se cargo una imagen.\n");
     }
 
     // Determinar el tipo de imagen y realizar el procesamiento adecuado
     if (strcmp(imageFormat, "png") == 0 || strcmp(imageFormat, "jpg") == 0 || strcmp(imageFormat, "jpeg") == 0) {
         // Convertir a escala de grises
         convertToGrayscale(imageData, imageSize);
-
+        
         // Aplicar ecualización de histograma
         equalizeHistogram(imageData, imageSize);
 
@@ -357,5 +339,17 @@ int main() {
     } else {
         printf("Formato de imagen no compatible.\n");
     }
+}
+
+int main() {
+    char filename[100]; // Se reserva espacio para el nombre del archivo
+    char outputFilename[100];
+    printf("Ingresa el nombre del archivo de imagen: ");
+    scanf("%s", filename);
+    printf("Ingresa el nombre del archivo de salida: ");
+    scanf("%s", outputFilename);
+    Histograma(filename,outputFilename);
+
+    return 1;
 }
 
