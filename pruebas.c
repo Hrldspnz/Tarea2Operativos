@@ -7,13 +7,12 @@
 #include <gif_lib.h> 
 
 void convertToGrayscale(unsigned char *data, size_t size) {
-    for (size_t i = 0; i < size; i += 3) {
+    for (size_t i = 0; i < size; i += 4) { // 4 bytes por píxel (RGBA)
         // Convertir a escala de grises (promedio de los canales RGB)
         unsigned char gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        data[i] = data[i + 1] = data[i + 2] = gray;
+        data[i] = data[i + 1] = data[i + 2] = gray; // R, G y B se establecen con el valor de escala de grises
     }
 }
-
 
 
 void equalizeHistogram(unsigned char *data, size_t size) {
@@ -38,11 +37,9 @@ void equalizeHistogram(unsigned char *data, size_t size) {
 }
 
 
-
-
-GifFileType* loadGIF(const char* nombreArchivo) {
+unsigned char* loadGIF(const char* filename, size_t* size, size_t* width, size_t* height) {
     int error;
-    GifFileType* gif = DGifOpenFileName(nombreArchivo, &error);
+    GifFileType* gif = DGifOpenFileName(filename, &error);
     if (!gif) {
         fprintf(stderr, "Error al abrir el archivo GIF: %s\n", GifErrorString(error));
         return NULL;
@@ -50,7 +47,13 @@ GifFileType* loadGIF(const char* nombreArchivo) {
 
     // Avanzar hasta el último frame (si hay más de uno)
     while (DGifGetRecordType(gif, &error) != TERMINATE_RECORD_TYPE) {
-        // No es necesario hacer nada aquí
+        if (DGifGetRecordType(gif, &error) == IMAGE_DESC_RECORD_TYPE) {
+            if (DGifGetImageDesc(gif) == GIF_ERROR) {
+                fprintf(stderr, "Error al obtener la descripción de la imagen.\n");
+                DGifCloseFile(gif, &error);
+                return NULL;
+            }
+        }
     }
 
     // Verificar si se leyó al menos un frame
@@ -60,13 +63,39 @@ GifFileType* loadGIF(const char* nombreArchivo) {
         return NULL;
     }
 
-    return gif;
+    // Obtener el tamaño del cuadro (frame)
+    *width = gif->SWidth;
+    *height = gif->SHeight;
+
+    // Crear un búfer para los datos de la imagen (frame)
+    unsigned char* data = (unsigned char*)malloc(3 * (*width) * (*height));
+    if (!data) {
+        fprintf(stderr, "Error al asignar memoria para los datos de la imagen.\n");
+        DGifCloseFile(gif, &error);
+        return NULL;
+    }
+
+    // Leer los datos del cuadro (frame)
+    if (DGifGetLine(gif, data, 3 * (*width) * (*height)) == GIF_ERROR) {
+        fprintf(stderr, "Error al leer los datos del cuadro (frame) GIF.\n");
+        free(data);
+        DGifCloseFile(gif, &error);
+        return NULL;
+    }
+
+    DGifCloseFile(gif, &error);
+
+    // Establecer el tamaño de la imagen
+    *size = 3 * (*width) * (*height);
+
+    return data;
 }
 
-void liberarGIFUnSoloFrame(GifFileType* gif) {
-    if (gif) {
-        int error;
-        DGifCloseFile(gif, &error);
+
+
+void liberarImagen(unsigned char* data) {
+    if (data) {
+        free(data);
     }
 }
 
@@ -267,34 +296,42 @@ void saveJPEG(const char *filename, unsigned char *data, size_t width, size_t he
     fclose(file);
 }
 
-int saveGIF(const char* nombreArchivo, GifFileType* gif, int width, int height, unsigned char* data) {
+int saveGIF(const char* filename, unsigned char* data, size_t size, size_t width, size_t height) {
     int error;
 
-    if (DGifOpenFileName(nombreArchivo, &error) == GIF_ERROR) {
-        fprintf(stderr, "Error al abrir el archivo de salida GIF.\n");
+    GifFileType* gif = EGifOpenFileName(filename, false, &error);
+    if (!gif) {
+        fprintf(stderr, "Error al abrir el archivo de salida GIF: %s\n", GifErrorString(error));
         return 1;
     }
 
-    if (DGifPutScreenDesc(gif, gif->SWidth, gif->SHeight, gif->SColorResolution, gif->SBackGroundColor, gif->SColorMap) == GIF_ERROR) {
+    if (EGifPutScreenDesc(gif, width, height, 8, 0, NULL) == GIF_ERROR) {
         fprintf(stderr, "Error al escribir la descripción de la pantalla GIF.\n");
+        EGifCloseFile(gif, &error);
         return 1;
     }
 
-    if (DGifPutImageDesc(gif, 0, 0, width, height, gif->SColorMap) == GIF_ERROR) {
+    GifColorType globalColor;
+    globalColor.Red = globalColor.Green = globalColor.Blue = 0;
+    if (EGifPutPixel(gif, 0, 0, 0, 0) == GIF_ERROR) {
+        fprintf(stderr, "Error al escribir los colores globales GIF.\n");
+        EGifCloseFile(gif, &error);
+        return 1;
+    }
+
+    if (EGifPutImageDesc(gif, 0, 0, width, height, NULL) == GIF_ERROR) {
         fprintf(stderr, "Error al escribir la descripción de la imagen GIF.\n");
+        EGifCloseFile(gif, &error);
         return 1;
     }
 
-    if (DGifPutLine(gif, data, 3 * width * height) == GIF_ERROR) {
+    if (EGifPutLine(gif, data, size) == GIF_ERROR) {
         fprintf(stderr, "Error al escribir los datos de la imagen GIF.\n");
+        EGifCloseFile(gif, &error);
         return 1;
     }
 
-    if (DGifCloseFile(gif, &error) == GIF_ERROR) {
-        fprintf(stderr, "Error al cerrar el archivo de salida GIF.\n");
-        return 1;
-    }
-
+    EGifCloseFile(gif, &error);
     return 0;
 }
 
@@ -332,7 +369,7 @@ int Histograma(char filename[100],char outputFilename[100]) {
         convertToGrayscale(imageData, imageSize);
 
         // Aplicar ecualización de histograma
-        //equalizeHistogram(imageData, imageSize);
+        equalizeHistogram(imageData, imageSize);
 
         // Guardar la imagen resultante
         saveGIF(outputFilename, imageData, imageWidth, imageHeight);
@@ -350,6 +387,6 @@ int main() {
     scanf("%s", outputFilename);
     Histograma(filename,outputFilename);
 
-    return 1;
+    return 0;
 }
 
