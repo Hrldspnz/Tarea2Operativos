@@ -32,14 +32,14 @@ typedef struct {
 
 char *trim(char *str) {
     int start = 0, end = strlen(str) - 1;
-    
+
     // Buscar el primer carácter no espaciado desde el principio
-    while (str[start] == ' ' || str[start] == '\t' || str[start] == '\n') {
+    while (str[start] == ' ' || str[start] == '\t' || str[start] == '\n' || str[start] == '\r') {
         start++;
     }
 
     // Buscar el primer carácter no espaciado desde el final
-    while (str[end] == ' ' || str[end] == '\t' || str[end] == '\n') {
+    while (str[end] == ' ' || str[end] == '\t' || str[end] == '\n' || str[end] == '\r') {
         end--;
     }
 
@@ -52,9 +52,10 @@ char *trim(char *str) {
     return trimmed;
 }
 
+
 // Función para cargar la configuración desde el archivo
 void cargarConfiguracion() {
-    FILE *archivoConfig = fopen("config.conf", "r");
+    FILE *archivoConfig = fopen("/home/Taller1/Tarea2/config.conf", "r");
     if (archivoConfig == NULL) {
         printf("Error al abrir el archivo de configuración.\n");
         exit(1);
@@ -78,6 +79,9 @@ void cargarConfiguracion() {
                     strcpy(DirColores, valor);
                 } else if (strcmp(clave, "DirHisto") == 0) {
                     strcpy(DirHisto, valor);
+                    printf("DirHisto: %s\n",DirHisto);
+
+
                 } else if (strcmp(clave, "DirLog") == 0) {
                     strcpy(DirLog, valor);
                 }
@@ -89,7 +93,6 @@ void cargarConfiguracion() {
 }
 
 void escribirEnRegistro(const char *mensaje) {
-    strcat(DirLog,"registro.log");
     // Abrir el archivo de registro en modo de escritura (si no existe, se creará)
     FILE *archivoLog = fopen(DirLog, "a"); // "a" para agregar al archivo existente
 
@@ -152,16 +155,16 @@ void handle_put_request2(int client_socket) {
         char imgName[50];
         char nuevoNombre[50];
         char sufijo[]="_hist";
-        char histopath[50]; // Debes definir MAX_PATH_LENGTH según tus necesidades
+        char histopath[150]; // Debes definir MAX_PATH_LENGTH según tus necesidades
 
         strcpy(histopath, DirHisto);
-        printf("Prueba\n");
+
 
         // Parsea el nombre de la imagen desde la solicitud si es necesario
         sscanf(request_buffer, "PUT /%s", imgName);
         //escribirEnRegistro(strcat("Imagen Analizada: ", imgName));
         char path[100];
-        strcpy(path, "./ImagenesRecibidas/");
+        strcpy(path, "/home/Taller1/Tarea2/ImagenesRecibidas/");
         strcat(path, imgName);
 
         FILE *file = fopen(path, "wb");
@@ -169,6 +172,7 @@ void handle_put_request2(int client_socket) {
             perror("Error opening file");
             return;
         }
+
 
         size_t data_length = bytes_received - (file_start - request_buffer);
         fwrite(file_start, 1, data_length, file);
@@ -179,7 +183,6 @@ void handle_put_request2(int client_socket) {
         fclose(file);
 
         char *punto = strrchr(imgName, '.');
-
         // Calcular la longitud del nombre sin la extensión
         size_t longitudSinExtension = punto - imgName;
 
@@ -189,7 +192,10 @@ void handle_put_request2(int client_socket) {
 
         // Agregar el sufijo deseado al nuevo nombre
         strcat(nuevoNombre, sufijo);
+        strcat(nuevoNombre, punto);
         strcat(histopath,nuevoNombre);
+
+        printf("Quinto histopath: %s\n",histopath);
 
         escribirEnRegistro("Ejecutando Histograma");
 
@@ -684,6 +690,8 @@ void Histograma(char filename[100],char outputFilename[100]) {
 
 int main() {
     cargarConfiguracion();
+    strcat(DirLog,"registro.log");
+
     int server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
