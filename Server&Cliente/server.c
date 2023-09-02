@@ -21,6 +21,7 @@ char DirLog[100];
 #define BUFFER_SIZE 50000
 
 void analyceColor(char *imgPath,char *imgName);
+void Histograma(char filename[100],char outputFilename[100]);
 
 
 typedef struct {
@@ -88,8 +89,9 @@ void cargarConfiguracion() {
 }
 
 void escribirEnRegistro(const char *mensaje) {
+    strcat(DirLog,"registro.log");
     // Abrir el archivo de registro en modo de escritura (si no existe, se creará)
-    FILE *archivoLog = fopen("registro.log", "a"); // "a" para agregar al archivo existente
+    FILE *archivoLog = fopen(DirLog, "a"); // "a" para agregar al archivo existente
 
     if (archivoLog == NULL) {
         printf("No se pudo abrir el archivo de registro.\n");
@@ -113,6 +115,8 @@ void escribirEnRegistro(const char *mensaje) {
 
 
 void handle_put_request2(int client_socket) {
+
+
     char request_buffer[BUFFER_SIZE];
     ssize_t bytes_received = 0;
 
@@ -148,10 +152,14 @@ void handle_put_request2(int client_socket) {
         char imgName[50];
         char nuevoNombre[50];
         char sufijo[]="_hist";
-        char histopath = "./ImagenesHist";
+        char histopath[50]; // Debes definir MAX_PATH_LENGTH según tus necesidades
+
+        strcpy(histopath, DirHisto);
+        printf("Prueba\n");
+
         // Parsea el nombre de la imagen desde la solicitud si es necesario
         sscanf(request_buffer, "PUT /%s", imgName);
-
+        //escribirEnRegistro(strcat("Imagen Analizada: ", imgName));
         char path[100];
         strcpy(path, "./ImagenesRecibidas/");
         strcat(path, imgName);
@@ -165,6 +173,9 @@ void handle_put_request2(int client_socket) {
         size_t data_length = bytes_received - (file_start - request_buffer);
         fwrite(file_start, 1, data_length, file);
 
+        // Asegúrate de que se haya completado la escritura en el archivo
+        fflush(file);
+        fsync(fileno(file));
         fclose(file);
 
         char *punto = strrchr(imgName, '.');
@@ -180,7 +191,10 @@ void handle_put_request2(int client_socket) {
         strcat(nuevoNombre, sufijo);
         strcat(histopath,nuevoNombre);
 
+        escribirEnRegistro("Ejecutando Histograma");
+
         Histograma(path,histopath);
+        escribirEnRegistro("Clasificando por color");
 
         analyceColor(path, imgName);
 
@@ -193,8 +207,9 @@ void handle_put_request2(int client_socket) {
     printf("\nMensaje completado.\n");
 }
 
+
 void analyceColor(char *imgPath,char *imgName){
-    const char *newPath = "./ImagenesColor/"; 
+    const char *newPath = DirColores; 
     FILE *jpg_file = fopen(imgPath, "rb");
     if (!jpg_file) {
         printf("No se pudo abrir la imagen.\n");
@@ -668,6 +683,7 @@ void Histograma(char filename[100],char outputFilename[100]) {
 
 
 int main() {
+    cargarConfiguracion();
     int server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
@@ -681,7 +697,7 @@ int main() {
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(PORT);
+    server_addr.sin_port = htons(Port);
 
     // Bind
     if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
@@ -695,7 +711,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Server listening on port %d...\n", PORT);
+    printf("Server listening on port %d...\n", Port);
 
     while (1) {
         // Accept incoming connections
@@ -706,7 +722,7 @@ int main() {
         }
 
         printf("Connection accepted...\n");
-
+        escribirEnRegistro("Petición de Cliente Recibida");
         // Manejar la solicitud en un nuevo hilo o proceso si es necesario
         handle_put_request2(client_socket);
 
