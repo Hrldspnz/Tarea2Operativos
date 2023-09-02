@@ -25,6 +25,28 @@ typedef struct {
     uint8_t red;
 } Pixel;
 
+char *trim(char *str) {
+    int start = 0, end = strlen(str) - 1;
+    
+    // Buscar el primer carácter no espaciado desde el principio
+    while (str[start] == ' ' || str[start] == '\t' || str[start] == '\n') {
+        start++;
+    }
+
+    // Buscar el primer carácter no espaciado desde el final
+    while (str[end] == ' ' || str[end] == '\t' || str[end] == '\n') {
+        end--;
+    }
+
+    // Copiar la subcadena sin espacios en blanco
+    int len = end - start + 1;
+    char *trimmed = (char *)malloc(len + 1);
+    strncpy(trimmed, str + start, len);
+    trimmed[len] = '\0';
+
+    return trimmed;
+}
+
 // Función para cargar la configuración desde el archivo
 void cargarConfiguracion() {
     FILE *archivoConfig = fopen("config.conf", "r");
