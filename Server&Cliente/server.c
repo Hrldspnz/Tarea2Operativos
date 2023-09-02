@@ -13,7 +13,11 @@
 #include <time.h>
 
 
-#define PORT 1717
+int Port;
+char DirColores[100]; // Supongamos un tamaño máximo de 100 caracteres
+char DirHisto[100];
+char DirLog[100];
+
 #define BUFFER_SIZE 50000
 
 void analyceColor(char *imgPath,char *imgName);
@@ -107,12 +111,6 @@ void escribirEnRegistro(const char *mensaje) {
     fclose(archivoLog);
 }
 
-int main() {
-    // Llamamos a la función escribirEnRegistro para registrar un mensaje
-    escribirEnRegistro("Este es un mensaje de registro desde una función.");
-
-    return 0;
-}
 
 void handle_put_request2(int client_socket) {
     char request_buffer[BUFFER_SIZE];
@@ -169,8 +167,6 @@ void handle_put_request2(int client_socket) {
 
         fclose(file);
 
-        analyceColor(path, imgName);
-
         char *punto = strrchr(imgName, '.');
 
         // Calcular la longitud del nombre sin la extensión
@@ -185,6 +181,8 @@ void handle_put_request2(int client_socket) {
         strcat(histopath,nuevoNombre);
 
         Histograma(path,histopath);
+
+        analyceColor(path, imgName);
 
     }
 
